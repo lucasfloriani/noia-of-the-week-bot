@@ -1,0 +1,38 @@
+{
+  "name": "noia-of-the-week-bot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "rimraf ./build && tsc",
+    "start": "npm run build && node build/index.js",
+    "start:dev": "nodemon"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lucasfloriani/noia-of-the-week-bot.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/lucasfloriani/noia-of-the-week-bot/issues"
+  },
+  "homepage": "https://github.com/lucasfloriani/noia-of-the-week-bot#readme",
+  "devDependencies": {
+    "@types/node": "^15.6.1",
+    "@types/ramda": "^0.27.40",
+    "nodemon": "^2.0.7",
+    "rimraf": "^3.0.2",
+    "ts-node": "^10.0.0",
+    "typescript": "^4.3.2"
+  },
+  "dependencies": {
+    "@slack/events-api": "^3.0.0",
+    "@slack/web-api": "^6.2.3",
+    "dotenv": "^10.0.0",
+    "fp-ts": "^2.10.5",
+    "ramda": "^0.27.1",
+    "slackbots": "^1.2.0"
+  }
+}
