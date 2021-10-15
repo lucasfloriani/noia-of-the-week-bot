@@ -2,7 +2,6 @@ import dotenv from 'dotenv'
 import { WebClient } from '@slack/web-api'
 import { createEventAdapter } from '@slack/events-api'
 import { exit } from 'process'
-import * as Task from 'fp-ts/Task';
 
 import { checkEnvVars, getPort } from './helpers/env'
 import { getUsersIDsInText, getUserIDByMention } from './helpers/slack'
@@ -13,7 +12,7 @@ type UserReactionCounting = {
 
 dotenv.config()
 
-if (!checkEnvVars("SLACK_TOKEN", "SLACK_SIGNIN")) {
+if (!checkEnvVars("SLACK_TOKEN", "SLACK_SIGNIN", "POST_IN_THREAD")) {
   exit(1);
 }
 
@@ -30,6 +29,7 @@ slackEvents.on('app_mention', async (payload) => {
       ts: payload.thread_ts,
       limit: 200,
     });
+    console.log("noiaReplies:", noiaReplies);
 
     const messagesWithReactions = noiaReplies.messages?.map(async (message) => {
       const messageReactions = await web.reactions.get({
@@ -37,43 +37,53 @@ slackEvents.on('app_mention', async (payload) => {
         timestamp: message.ts,
       })
       const usersMentioned = getUsersIDsInText(message.text)
+      const uniqueUsersMentioned = Array.from(new Set(usersMentioned))
 
-      return { usersMentioned, messageReactions }
+      return { usersMentioned: uniqueUsersMentioned, messageReactions }
     });
+    console.log("messagesWithReactions:", messagesWithReactions);
 
     const messagesAndReactions = messagesWithReactions ? await Promise.all(messagesWithReactions) : [];
+    console.log("messagesAndReactions:", messagesAndReactions);
     const countingOfReactionsPerUser = messagesAndReactions.map((item) => {
       return item.usersMentioned.map(mention => ({
         userID: mention,
         qtyOfReactions: item.messageReactions.message?.reactions?.reduce((acc, reaction) => acc + (reaction.count || 0), 0) ?? 0
       }))
     })
+    console.log("countingOfReactionsPerUser:", countingOfReactionsPerUser);
 
     const allCouting = countingOfReactionsPerUser.flat(1);
     const resultInObj = allCouting.reduce((acc, item) => ({
       ...acc,
       ...({ [item.userID]: acc[item.userID] ? acc[item.userID] + item.qtyOfReactions : item.qtyOfReactions }),
     }), {} as UserReactionCounting);
+    console.log("resultInObj:", resultInObj);
 
     const items = Object.entries(resultInObj).sort((a, b) => {
       if (a[1] < b[1]) return 1
       if (a[1] > b[1]) return -1
       return 0;
     })
+    console.log("items:", items);
 
-    const messagesCalls = items.slice(0, 3).map(async (item, index) => {
+    const messagesCalls = items.map(async (item, index) => {
       const userInfo = await web.users.info({ user: getUserIDByMention(item[0]) });
-      return `${index + 1} => ${userInfo.user?.profile?.display_name} (${item[1]} votos)`;
+      return `${index + 1} => ${userInfo.user?.profile?.display_name || userInfo.user?.real_name} (${item[1]} votos)`;
     });
+    console.log("messagesCalls:", messagesCalls);
 
     const messages = await Promise.all(messagesCalls);
     const message = messages.join('\n');
+    console.log("message:", message);
 
-    await web.chat.postMessage({
-      channel: payload.channel,
-      thread_ts: threadTS!,
-      text: message,
-    });
+    if (process.env.POST_IN_THREAD === 'true') {
+      await web.chat.postMessage({
+        channel: payload.channel,
+        thread_ts: threadTS!,
+        text: message,
+      });
+    }
   } catch (e) {
     console.error(e);
   }
